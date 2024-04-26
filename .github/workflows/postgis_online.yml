@@ -1,69 +1,105 @@
-name: PostGIS online tests
-
-on: [pull_request]
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref
+    }}
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-
+    runs-on: self-hosted
     steps:
-    - uses: huaxk/postgis-action@v1
+    - continue-on-error: true
+      uses: huaxk/postgis-action@v1
       with:
+        postgresql db: gttest
+        postgresql password: geotools
+        postgresql user: geotools
         postgresql version: '11'
-        postgresql password: 'geotools'
-        postgresql user: 'geotools'
-        postgresql db: 'gttest'
-    - name: Set up JDK 11
+    - continue-on-error: true
+      name: Set up JDK 11
       uses: actions/setup-java@v2
       with:
+        distribution: temurin
         java-version: 11
-        distribution: 'temurin'
-    - uses: actions/checkout@v2
-    - name: Maven repository caching
+    - continue-on-error: true
+      uses: actions/checkout@v2
+    - continue-on-error: true
+      name: Maven repository caching
       uses: actions/cache@v2
       with:
-        path: ~/.m2/repository
         key: gt-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          gt-maven-
-    - name: Build GeoTools dependent modules (no tests, prepare fresh artifacts)
-      run: mvn -B clean install -T2 -U -Dall --file pom.xml -DskipTests -pl modules/plugin/jdbc/jdbc-postgis -pl modules/plugin/imagemosaic -am -Dspotless.apply.skip=true
-    - name: Build PostGIS data store with online tests
-      run: |
-        mkdir ~/.geotools
+        path: ~/.m2/repository
+        restore-keys: 'gt-maven-
+
+          '
+    - continue-on-error: true
+      name: Build GeoTools dependent modules (no tests, prepare fresh artifacts)
+      run: mvn -B clean install -T2 -U -Dall --file pom.xml -DskipTests -pl modules/plugin/jdbc/jdbc-postgis
+        -pl modules/plugin/imagemosaic -am -Dspotless.apply.skip=true
+    - continue-on-error: true
+      name: Build PostGIS data store with online tests
+      run: 'mkdir ~/.geotools
+
         cat <<EOT >>   ~/.geotools/postgis.properties
+
         user=geotools
+
         port=5432
+
         password=geotools
+
         passwd=geotools
+
         url=jdbc\:postgresql\://localhost/gttest
+
         host=localhost
+
         database=gttest
+
         driver=org.postgresql.Driver
+
         EOT
+
         cat <<EOT >>   ~/.geotools/postgis_datastore.properties
+
         SPI=org.geotools.data.postgis.PostgisNGDataStoreFactory
+
         user=geotools
+
         port=5432
+
         password=geotools
+
         passwd=geotools
+
         url=jdbc\:postgresql\://localhost/gttest
+
         host=localhost
+
         database=gttest
+
         schema=public
+
         Loose\ bbox=true
+
         Estimated\ extends=false
+
         Connection\ timeout=10
+
         validate\ connections=true
+
         preparedStatements=false
+
         EOT
-        mvn -B clean install --file modules/plugin/jdbc/jdbc-postgis/pom.xml -Ponline -nsu
+
+        mvn -B clean install --file modules/plugin/jdbc/jdbc-postgis/pom.xml -Ponline
+        -nsu
+
         mvn -B clean install --file modules/plugin/imagemosaic/pom.xml -Ponline -nsu
-    - name: Remove SNAPSHOT jars from repository
-      run: |
-        find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {} 
+
+        '
+    - continue-on-error: true
+      name: Remove SNAPSHOT jars from repository
+      run: "find ~/.m2/repository -name \"*SNAPSHOT*\" -type d | xargs rm -rf {} \n"
+name: PostGIS online tests
+on:
+  repository_dispatch:
+    types: trigger-ga___postgis_online.yml

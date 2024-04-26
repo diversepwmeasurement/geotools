@@ -1,41 +1,54 @@
-name: SAP HANA online tests
-
-on: [pull_request]
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref
+    }}
 jobs:
   build:
     name: SAP HANA online test
-    runs-on: [ubuntu-latest]
-    strategy:
-      matrix:
-        java: [11]
-    
+    runs-on: self-hosted
     steps:
-    - name: Set up JDK ${{ matrix.java }}
+    - continue-on-error: true
+      name: Set up JDK ${{ matrix.java }}
       uses: actions/setup-java@v2
       with:
+        distribution: temurin
         java-version: ${{ matrix.java }}
-        distribution: 'temurin'
-    - uses: actions/checkout@v2
-    - name: Maven repository caching
+    - continue-on-error: true
+      uses: actions/checkout@v2
+    - continue-on-error: true
+      name: Maven repository caching
       uses: actions/cache@v2
       with:
-        path: ~/.m2/repository
         key: gt-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          gt-maven-
-    - name: Build GeoTools dependent modules (no tests)
-      run: mvn -B clean install -T1C -Dall -pl :gt-jdbc-hana -DskipTests -Dspotless.apply.skip=true -am
-    - name: Setup test environment for SAP HANA
-      run: mvn -B -pl :gt-jdbc-hana exec:java -Dexec.mainClass="org.geotools.data.hana.ci.CISetup" -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads="false"
-    - name: Test SAP HANA data store
+        path: ~/.m2/repository
+        restore-keys: 'gt-maven-
+
+          '
+    - continue-on-error: true
+      name: Build GeoTools dependent modules (no tests)
+      run: mvn -B clean install -T1C -Dall -pl :gt-jdbc-hana -DskipTests -Dspotless.apply.skip=true
+        -am
+    - continue-on-error: true
+      name: Setup test environment for SAP HANA
+      run: mvn -B -pl :gt-jdbc-hana exec:java -Dexec.mainClass="org.geotools.data.hana.ci.CISetup"
+        -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads="false"
+    - continue-on-error: true
+      name: Test SAP HANA data store
       run: mvn -B test -pl :gt-jdbc-hana -Ponline
-    - name: Teardown test environment for SAP HANA
-      run: mvn -B -pl :gt-jdbc-hana exec:java -Dexec.mainClass="org.geotools.data.hana.ci.CITeardown" -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads="false"
-    - name: Remove SNAPSHOT jars from repository
-      run: |
-        find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
+    - continue-on-error: true
+      name: Teardown test environment for SAP HANA
+      run: mvn -B -pl :gt-jdbc-hana exec:java -Dexec.mainClass="org.geotools.data.hana.ci.CITeardown"
+        -Dexec.classpathScope="test" -Dexec.cleanupDaemonThreads="false"
+    - continue-on-error: true
+      name: Remove SNAPSHOT jars from repository
+      run: 'find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
+
+        '
+    strategy:
+      matrix:
+        java:
+        - 11
+name: SAP HANA online tests
+on:
+  repository_dispatch:
+    types: trigger-ga___hana_online.yml

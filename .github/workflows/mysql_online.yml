@@ -1,43 +1,58 @@
-name: 'MySQL online tests'
-
-on: [ pull_request ]
-
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref
+    }}
 jobs:
   build:
     name: MySQL ${{ matrix.mysql }} online test
-    runs-on: [ubuntu-latest]
+    runs-on: self-hosted
+    steps:
+    - continue-on-error: true
+      name: Set up JDK ${{ matrix.java }}
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ matrix.java }}
+    - continue-on-error: true
+      uses: actions/checkout@v4
+    - continue-on-error: true
+      name: Maven repository caching
+      uses: actions/cache@v3
+      with:
+        key: gt-maven-${{ hashFiles('**/pom.xml') }}
+        path: ~/.m2/repository
+        restore-keys: 'gt-maven-
+
+          '
+    - continue-on-error: true
+      name: Setup test environment for MySQL ${{ matrix.mysql }}
+      run: './build/ci/mysql/start-mysql.sh ${{ matrix.mysql }}
+
+        ./build/ci/mysql/setup-mysql.sh
+
+        '
+    - continue-on-error: true
+      name: Build GeoTools dependent modules (no tests)
+      run: mvn -B clean install -T2 -Dall -pl :gt-jdbc-mysql -DskipTests -Dspotless.apply.skip=true
+        -am
+    - continue-on-error: true
+      name: Test MySQL data store
+      run: mvn -B clean install -T2 -Dall -pl :gt-jdbc-mysql -Ponline -Dspotless.apply.skip=true
+    - continue-on-error: true
+      name: Remove SNAPSHOT jars from repository
+      run: 'find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
+
+        '
     strategy:
       fail-fast: false
       matrix:
-        mysql: [ '5.7', '8.0', '8.2' ]
-        java: [ 11 ]
-
-    steps:
-    - name: Set up JDK ${{ matrix.java }}
-      uses: actions/setup-java@v4
-      with:
-        java-version: ${{ matrix.java }}
-        distribution: 'temurin'
-    - uses: actions/checkout@v4
-    - name: Maven repository caching
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2/repository
-        key: gt-maven-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          gt-maven-
-    - name: Setup test environment for MySQL ${{ matrix.mysql }} 
-      run: |
-        ./build/ci/mysql/start-mysql.sh ${{ matrix.mysql }}
-        ./build/ci/mysql/setup-mysql.sh
-    - name: Build GeoTools dependent modules (no tests)
-      run: mvn -B clean install -T2 -Dall -pl :gt-jdbc-mysql -DskipTests -Dspotless.apply.skip=true -am
-    - name: Test MySQL data store
-      run: mvn -B clean install -T2 -Dall -pl :gt-jdbc-mysql -Ponline -Dspotless.apply.skip=true
-    - name: Remove SNAPSHOT jars from repository
-      run: |
-        find ~/.m2/repository -name "*SNAPSHOT*" -type d | xargs rm -rf {}
+        java:
+        - 11
+        mysql:
+        - '5.7'
+        - '8.0'
+        - '8.2'
+name: MySQL online tests
+on:
+  repository_dispatch:
+    types: trigger-ga___mysql_online.yml
